@@ -26,8 +26,12 @@ export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 export const JULIA_WORKER_SCRIPT = path.join(JULIA_DIR, "worker.jl");
 export const JULIA_RUNNER_SCRIPT = path.join(JULIA_DIR, "run_earth4all.jl");
 
+const SYSIMAGE_EXT = process.platform === "win32" ? "dll" : process.platform === "darwin" ? "dylib" : "so";
+export const JULIA_SYSIMAGE_PATH = path.join(JULIA_DIR, `earth4all_sysimage.${SYSIMAGE_EXT}`);
+
 export const SIMULATION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 export const JULIA_STARTUP_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes for first compile
+export const JULIA_SYSIMAGE_STARTUP_TIMEOUT_MS = 30 * 1000; // 30 seconds when using sysimage
 
 export const MODEL_START_YEAR = 1980;
 export const MODEL_END_YEAR = 2100;

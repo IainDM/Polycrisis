@@ -12,6 +12,7 @@ Pkg.add([
     "WorldDynamics",
     "JSON",
     "IfElse",
+    "PackageCompiler",
 ])
 
 println("Dependencies installed successfully.")
@@ -21,3 +22,6 @@ println("  git clone https://github.com/worlddynamics/Earth4All.jl")
 println()
 println("Set the EARTH4ALL_SRC environment variable to the src/ directory:")
 println("  export EARTH4ALL_SRC=/path/to/Earth4All.jl/src")
+println()
+println("To speed up Julia startup, build a custom sysimage:")
+println("  julia julia/build_sysimage.jl")
