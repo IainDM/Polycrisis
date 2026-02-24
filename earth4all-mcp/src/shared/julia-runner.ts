@@ -1,7 +1,9 @@
 import { spawn, type ChildProcess } from "child_process";
 import { existsSync } from "fs";
+import path from "path";
 import { logger } from "./logger.js";
 import {
+  PROJECT_ROOT,
   JULIA_WORKER_SCRIPT,
   JULIA_SYSIMAGE_PATH,
   JULIA_STARTUP_TIMEOUT_MS,
@@ -55,7 +57,7 @@ function getJuliaFlags(): { flags: string[]; usingSysimage: boolean } {
 function getEarth4AllSrc(): string {
   return (
     process.env.EARTH4ALL_SRC ??
-    new URL("../../Earth4All.jl/src", import.meta.url).pathname
+    path.resolve(PROJECT_ROOT, "..", "Earth4All.jl", "src")
   );
 }
 
