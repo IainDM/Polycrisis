@@ -17,7 +17,8 @@
 #   {"command": "exit"}
 #     → worker shuts down
 
-using JSON
+# Load shared pure logic (constants, overrides, protocol helpers)
+include(joinpath(@__DIR__, "src", "common.jl"))
 
 # Get Earth4All.jl source path
 const E4A_SRC = if length(ARGS) >= 1
@@ -44,7 +45,7 @@ end
 
 using ModelingToolkit
 
-# Sector mapping (same as run_earth4all.jl)
+# Sector mapping — full version with Earth4All function references
 const SECTOR_MAP = Dict(
     "climate" => (getparams=Earth4All.Climate.getparameters, getinits=Earth4All.Climate.getinitialisations, pars_kw=:cli_pars, inits_kw=:cli_inits),
     "demand" => (getparams=Earth4All.Demand.getparameters, getinits=Earth4All.Demand.getinitialisations, pars_kw=:dem_pars, inits_kw=:dem_inits),
@@ -61,40 +62,11 @@ const SECTOR_MAP = Dict(
 )
 
 function handle_run(input::Dict)
-    warnings = String[]
     t_start = time()
-
-    kwargs = Dict{Symbol, Any}()
     param_overrides = get(input, "parameters", Dict())
     init_overrides = get(input, "initialisations", Dict())
 
-    for (sector_name, sector_info) in SECTOR_MAP
-        pars = sector_info.getparams()
-        if haskey(param_overrides, sector_name)
-            for (k, v) in param_overrides[sector_name]
-                sym = Symbol(k)
-                if haskey(pars, sym)
-                    pars[sym] = Float64(v)
-                else
-                    push!(warnings, "Unknown parameter $sector_name.$k — skipped")
-                end
-            end
-        end
-        kwargs[sector_info.pars_kw] = pars
-
-        inits = sector_info.getinits()
-        if haskey(init_overrides, sector_name)
-            for (k, v) in init_overrides[sector_name]
-                sym = Symbol(k)
-                if haskey(inits, sym)
-                    inits[sym] = Float64(v)
-                else
-                    push!(warnings, "Unknown initialisation $sector_name.$k — skipped")
-                end
-            end
-        end
-        kwargs[sector_info.inits_kw] = inits
-    end
+    kwargs, warnings = build_sector_kwargs(SECTOR_MAP, param_overrides, init_overrides)
 
     sol = Earth4All.run_e4a_solution(; kwargs...)
     solve_time = time() - t_start
@@ -104,10 +76,9 @@ function handle_run(input::Dict)
     @named dem = Earth4All.Demand.demand()
     @named wel = Earth4All.Wellbeing.wellbeing()
 
-    milestone_years = [2025, 2050, 2075, 2100]
     dashboard = []
 
-    for year in milestone_years
+    for year in MILESTONE_YEARS
         idx = argmin(abs.(sol.t .- year))
         push!(dashboard, Dict(
             "year" => year,
@@ -141,28 +112,7 @@ function handle_run(input::Dict)
         end
     end
 
-    return Dict(
-        "success" => true,
-        "message" => "Simulation completed successfully",
-        "solve_time_seconds" => solve_time,
-        "dashboard" => dashboard,
-        "timeseries" => timeseries,
-        "warnings" => warnings,
-    )
-end
-
-function handle_command(input::Dict)
-    command = get(input, "command", "run")
-
-    if command == "ping"
-        return Dict("status" => "ok", "message" => "pong")
-    elseif command == "exit"
-        return nothing  # signal to exit
-    elseif command == "run"
-        return handle_run(input)
-    else
-        return Dict("status" => "error", "message" => "Unknown command: $command")
-    end
+    return format_success_result(dashboard, timeseries, solve_time, warnings)
 end
 
 # Signal readiness
@@ -176,7 +126,7 @@ while !eof(stdin)
 
     try
         input = JSON.parse(line)
-        result = handle_command(input)
+        result = handle_command(input, handle_run)
 
         if result === nothing
             # Exit command
@@ -186,13 +136,9 @@ while !eof(stdin)
         println(JSON.json(result))
         flush(stdout)
     catch e
-        error_result = Dict(
-            "success" => false,
-            "message" => "Error: $(sprint(showerror, e))",
-            "solve_time_seconds" => 0,
-            "dashboard" => [],
-            "timeseries" => Dict(),
-            "warnings" => [sprint(showerror, e, catch_backtrace())],
+        error_result = format_error_result(
+            "Error: $(sprint(showerror, e))";
+            warnings=[sprint(showerror, e, catch_backtrace())],
         )
         println(JSON.json(error_result))
         flush(stdout)
