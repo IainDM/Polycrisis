@@ -12,6 +12,12 @@ import {
 } from "../constants.js";
 import type { SectorId, SectorParameters, SimulationResult } from "../earth4all/types.js";
 
+interface PendingCommand {
+  resolve: (value: string) => void;
+  reject: (reason: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
+
 interface JuliaWorkerState {
   process: ChildProcess | null;
   ready: boolean;
@@ -19,6 +25,7 @@ interface JuliaWorkerState {
   pendingResolve: ((value: string) => void) | null;
   pendingReject: ((reason: Error) => void) | null;
   buffer: string;
+  commandQueue: PendingCommand[];
 }
 
 const state: JuliaWorkerState = {
@@ -28,6 +35,7 @@ const state: JuliaWorkerState = {
   pendingResolve: null,
   pendingReject: null,
   buffer: "",
+  commandQueue: [],
 };
 
 function getJuliaCommand(): string {
@@ -52,6 +60,19 @@ function getJuliaFlags(): { flags: string[]; usingSysimage: boolean } {
   }
 
   return { flags, usingSysimage };
+}
+
+function rejectAllQueued(err: Error): void {
+  if (state.pendingReject) {
+    state.pendingReject(err);
+    state.pendingResolve = null;
+    state.pendingReject = null;
+  }
+  for (const cmd of state.commandQueue) {
+    clearTimeout(cmd.timeout);
+    cmd.reject(err);
+  }
+  state.commandQueue = [];
 }
 
 function getEarth4AllSrc(): string {
@@ -147,11 +168,7 @@ export async function ensureWorker(): Promise<void> {
       state.starting = false;
       state.ready = false;
       clearTimeout(timeout);
-      if (state.pendingReject) {
-        state.pendingReject(err);
-        state.pendingResolve = null;
-        state.pendingReject = null;
-      }
+      rejectAllQueued(err);
       reject(err);
     });
 
@@ -160,13 +177,33 @@ export async function ensureWorker(): Promise<void> {
       state.starting = false;
       state.process = null;
       logger.info(`Julia worker exited with code ${code}`);
-      if (state.pendingReject) {
-        state.pendingReject(new Error(`Julia worker exited with code ${code}`));
-        state.pendingResolve = null;
-        state.pendingReject = null;
-      }
+      rejectAllQueued(new Error(`Julia worker exited with code ${code}`));
     });
   });
+}
+
+function dispatchNext(): void {
+  if (state.commandQueue.length === 0 || state.pendingResolve) {
+    return; // Nothing queued, or a command is already in-flight
+  }
+
+  const next = state.commandQueue[0];
+  state.pendingResolve = (value: string) => {
+    clearTimeout(next.timeout);
+    state.commandQueue.shift();
+    state.pendingResolve = null;
+    state.pendingReject = null;
+    next.resolve(value);
+    dispatchNext(); // Send next queued command
+  };
+  state.pendingReject = (reason: Error) => {
+    clearTimeout(next.timeout);
+    state.commandQueue.shift();
+    state.pendingResolve = null;
+    state.pendingReject = null;
+    next.reject(reason);
+    dispatchNext();
+  };
 }
 
 async function sendCommand(command: Record<string, unknown>): Promise<string> {
@@ -178,22 +215,27 @@ async function sendCommand(command: Record<string, unknown>): Promise<string> {
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      state.pendingResolve = null;
-      state.pendingReject = null;
+      // Remove this entry from the queue
+      const idx = state.commandQueue.findIndex((c) => c.timeout === timeout);
+      if (idx !== -1) state.commandQueue.splice(idx, 1);
+      if (state.pendingResolve === null) {
+        // Wasn't dispatched yet, just reject
+      } else {
+        state.pendingResolve = null;
+        state.pendingReject = null;
+        dispatchNext();
+      }
       reject(new Error(`Julia command timed out after ${SIMULATION_TIMEOUT_MS / 1000}s`));
     }, SIMULATION_TIMEOUT_MS);
 
-    state.pendingResolve = (value: string) => {
-      clearTimeout(timeout);
-      resolve(value);
-    };
-    state.pendingReject = (reason: Error) => {
-      clearTimeout(timeout);
-      reject(reason);
-    };
+    state.commandQueue.push({ resolve, reject, timeout });
 
+    // Write the command immediately — Julia will process them in order
     const json = JSON.stringify(command);
     state.process!.stdin!.write(json + "\n");
+
+    // If no command is in-flight, dispatch this one
+    dispatchNext();
   });
 }
 
