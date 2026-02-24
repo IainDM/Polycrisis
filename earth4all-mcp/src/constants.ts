@@ -7,8 +7,21 @@ const __dirname = path.dirname(__filename);
 export const PROJECT_ROOT = path.resolve(__dirname, "..");
 export const DATA_DIR = path.join(PROJECT_ROOT, "data");
 export const REFERENCE_DIR = path.join(DATA_DIR, "reference");
-export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 export const JULIA_DIR = path.join(PROJECT_ROOT, "julia");
+
+let _projectsDir =
+  process.env.EARTH4ALL_PROJECTS_DIR ?? path.join(DATA_DIR, "projects");
+
+export function getProjectsDir(): string {
+  return _projectsDir;
+}
+
+export function setProjectsDir(dir: string): void {
+  _projectsDir = dir;
+}
+
+// Keep for backward compatibility but prefer getProjectsDir()
+export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 
 export const JULIA_WORKER_SCRIPT = path.join(JULIA_DIR, "worker.jl");
 export const JULIA_RUNNER_SCRIPT = path.join(JULIA_DIR, "run_earth4all.jl");

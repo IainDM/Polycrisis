@@ -8,7 +8,7 @@ import type {
   ProjectConfig,
 } from "../earth4all/types.js";
 import { SECTOR_IDS } from "../earth4all/types.js";
-import { PROJECTS_DIR, REFERENCE_DIR } from "../constants.js";
+import { getProjectsDir, REFERENCE_DIR } from "../constants.js";
 import { getDefaultParameters } from "../earth4all/parameters.js";
 import { getGiantLeapOverrides } from "../earth4all/scenarios.js";
 import {
@@ -29,7 +29,7 @@ function generateId(): string {
 }
 
 function getProjectDir(projectId: string): string {
-  return path.join(PROJECTS_DIR, projectId);
+  return path.join(getProjectsDir(), projectId);
 }
 
 export async function listScenarios(): Promise<
@@ -53,12 +53,12 @@ export async function listScenarios(): Promise<
 
 export async function listProjects(): Promise<ProjectConfig[]> {
   try {
-    await fs.mkdir(PROJECTS_DIR, { recursive: true });
-    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
+    await fs.mkdir(getProjectsDir(), { recursive: true });
+    const entries = await fs.readdir(getProjectsDir(), { withFileTypes: true });
     const projects: ProjectConfig[] = [];
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        const dir = path.join(PROJECTS_DIR, entry.name);
+        const dir = path.join(getProjectsDir(), entry.name);
         if (await projectExists(dir)) {
           projects.push(await readProjectConfig(dir));
         }
