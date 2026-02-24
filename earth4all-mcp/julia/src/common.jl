@@ -48,8 +48,8 @@ Apply parameter/initialisation overrides from a `Dict{String,Any}` onto a
 in `warnings`. Returns the number of overrides successfully applied.
 """
 function apply_overrides!(
-    target::Dict{Symbol},
-    overrides::Dict,
+    target::AbstractDict{Symbol},
+    overrides::AbstractDict,
     sector_name::AbstractString,
     kind::AbstractString,
     warnings::Vector{String},
@@ -75,7 +75,7 @@ Build the keyword-arguments dictionary for an Earth4All simulation call.
   `getparams`, `getinits`, `pars_kw`, `inits_kw`.
 Returns `(kwargs::Dict{Symbol,Any}, warnings::Vector{String})`.
 """
-function build_sector_kwargs(sector_map, param_overrides::Dict, init_overrides::Dict)
+function build_sector_kwargs(sector_map, param_overrides::AbstractDict, init_overrides::AbstractDict)
     kwargs = Dict{Symbol, Any}()
     warnings = String[]
 
@@ -107,7 +107,7 @@ Route a worker-protocol command dictionary. Returns a `Dict` response for
 the client, or `nothing` to signal the worker should exit.
 `run_fn(input)` is invoked for `"run"` commands.
 """
-function handle_command(input::Dict, run_fn::Function)
+function handle_command(input::AbstractDict, run_fn::Function)
     command = get(input, "command", "run")
 
     if command == "ping"
