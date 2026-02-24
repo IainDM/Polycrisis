@@ -11,7 +11,8 @@
     "start:modelling": "npx tsx src/servers/modelling-server.ts",
     "start:explorer": "npx tsx src/servers/explorer-server.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:julia": "julia julia/test/runtests.jl"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

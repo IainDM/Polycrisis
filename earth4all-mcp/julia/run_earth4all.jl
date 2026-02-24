@@ -23,7 +23,8 @@
 #   "warnings": []
 # }
 
-using JSON
+# Load shared pure logic (constants, overrides, protocol helpers)
+include(joinpath(@__DIR__, "src", "common.jl"))
 
 # Get Earth4All.jl source path from args or environment
 const E4A_SRC = if length(ARGS) >= 1
@@ -38,13 +39,9 @@ end
 try
     include(joinpath(E4A_SRC, "Earth4All.jl"))
 catch e
-    result = Dict(
-        "success" => false,
-        "message" => "Failed to load Earth4All.jl from $E4A_SRC: $(sprint(showerror, e))",
-        "solve_time_seconds" => 0,
-        "dashboard" => [],
-        "timeseries" => Dict(),
-        "warnings" => ["Earth4All.jl source not found. Set EARTH4ALL_SRC environment variable."]
+    result = format_error_result(
+        "Failed to load Earth4All.jl from $E4A_SRC: $(sprint(showerror, e))";
+        warnings=["Earth4All.jl source not found. Set EARTH4ALL_SRC environment variable."],
     )
     println(JSON.json(result))
     exit(1)
@@ -73,44 +70,12 @@ const SECTOR_MAP = Dict(
 )
 
 function run_simulation(input::Dict)
-    warnings = String[]
     t_start = time()
-
-    # Build parameter and initialisation dictionaries
-    kwargs = Dict{Symbol, Any}()
 
     param_overrides = get(input, "parameters", Dict())
     init_overrides = get(input, "initialisations", Dict())
 
-    for (sector_name, sector_info) in SECTOR_MAP
-        # Parameters
-        pars = sector_info.getparams()
-        if haskey(param_overrides, sector_name)
-            for (k, v) in param_overrides[sector_name]
-                sym = Symbol(k)
-                if haskey(pars, sym)
-                    pars[sym] = Float64(v)
-                else
-                    push!(warnings, "Unknown parameter $sector_name.$k — skipped")
-                end
-            end
-        end
-        kwargs[sector_info.pars_kw] = pars
-
-        # Initialisations
-        inits = sector_info.getinits()
-        if haskey(init_overrides, sector_name)
-            for (k, v) in init_overrides[sector_name]
-                sym = Symbol(k)
-                if haskey(inits, sym)
-                    inits[sym] = Float64(v)
-                else
-                    push!(warnings, "Unknown initialisation $sector_name.$k — skipped")
-                end
-            end
-        end
-        kwargs[sector_info.inits_kw] = inits
-    end
+    kwargs, warnings = build_sector_kwargs(SECTOR_MAP, param_overrides, init_overrides)
 
     # Build and solve the model
     system = Earth4All.run_e4a(; kwargs...)
@@ -124,10 +89,9 @@ function run_simulation(input::Dict)
     @named dem = Earth4All.Demand.demand()
     @named wel = Earth4All.Wellbeing.wellbeing()
 
-    milestone_years = [2025, 2050, 2075, 2100]
     dashboard = []
 
-    for year in milestone_years
+    for year in MILESTONE_YEARS
         # Find the index closest to the target year
         idx = argmin(abs.(sol.t .- year))
         push!(dashboard, Dict(
@@ -166,14 +130,7 @@ function run_simulation(input::Dict)
         end
     end
 
-    return Dict(
-        "success" => true,
-        "message" => "Simulation completed successfully",
-        "solve_time_seconds" => solve_time,
-        "dashboard" => dashboard,
-        "timeseries" => timeseries,
-        "warnings" => warnings,
-    )
+    return format_success_result(dashboard, timeseries, solve_time, warnings)
 end
 
 # Main execution
@@ -181,13 +138,9 @@ try
     result = run_simulation(input)
     println(JSON.json(result))
 catch e
-    result = Dict(
-        "success" => false,
-        "message" => "Simulation failed: $(sprint(showerror, e))",
-        "solve_time_seconds" => 0,
-        "dashboard" => [],
-        "timeseries" => Dict(),
-        "warnings" => [sprint(showerror, e, catch_backtrace())],
+    result = format_error_result(
+        "Simulation failed: $(sprint(showerror, e))";
+        warnings=[sprint(showerror, e, catch_backtrace())],
     )
     println(JSON.json(result))
     exit(1)
