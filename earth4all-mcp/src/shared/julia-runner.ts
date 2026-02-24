@@ -29,6 +29,16 @@ function getJuliaCommand(): string {
   return process.env.JULIA_CMD ?? "julia";
 }
 
+function getJuliaFlags(): string[] {
+  const flags = process.env.JULIA_FLAGS?.split(/\s+/).filter(Boolean) ?? [];
+  // --pkgimages=no avoids segfaults during native code image serialisation
+  // in memory-constrained or sandboxed environments.
+  if (!flags.some((f) => f.startsWith("--pkgimages"))) {
+    flags.push("--pkgimages=no");
+  }
+  return flags;
+}
+
 function getEarth4AllSrc(): string {
   return (
     process.env.EARTH4ALL_SRC ??
@@ -60,11 +70,12 @@ export async function ensureWorker(): Promise<void> {
 
   return new Promise((resolve, reject) => {
     const juliaCmd = getJuliaCommand();
+    const juliaFlags = getJuliaFlags();
     const e4aSrc = getEarth4AllSrc();
 
-    logger.info(`Starting Julia worker: ${juliaCmd} ${JULIA_WORKER_SCRIPT} ${e4aSrc}`);
+    logger.info(`Starting Julia worker: ${juliaCmd} ${[...juliaFlags, JULIA_WORKER_SCRIPT, e4aSrc].join(" ")}`);
 
-    const proc = spawn(juliaCmd, [JULIA_WORKER_SCRIPT, e4aSrc], {
+    const proc = spawn(juliaCmd, [...juliaFlags, JULIA_WORKER_SCRIPT, e4aSrc], {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, EARTH4ALL_SRC: e4aSrc },
     });
