@@ -37,6 +37,7 @@ const PACKAGES = [
     :WorldDynamics,
     :JSON,
     :IfElse,
+    :PlotlyJS,
 ]
 
 # Write a temporary precompile execution script.
@@ -52,6 +53,7 @@ open(PRECOMPILE_SCRIPT, "w") do f
     using WorldDynamics
     using JSON
     using IfElse
+    using PlotlyJS
 
     # Exercise JSON round-trip (common hot path in worker protocol)
     let d = Dict("command" => "ping", "value" => 42.0)
