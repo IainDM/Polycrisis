@@ -1,8 +1,11 @@
 import { spawn, type ChildProcess } from "child_process";
+import { existsSync } from "fs";
 import { logger } from "./logger.js";
 import {
   JULIA_WORKER_SCRIPT,
+  JULIA_SYSIMAGE_PATH,
   JULIA_STARTUP_TIMEOUT_MS,
+  JULIA_SYSIMAGE_STARTUP_TIMEOUT_MS,
   SIMULATION_TIMEOUT_MS,
 } from "../constants.js";
 import type { SectorId, SectorParameters, SimulationResult } from "../earth4all/types.js";
@@ -29,14 +32,24 @@ function getJuliaCommand(): string {
   return process.env.JULIA_CMD ?? "julia";
 }
 
-function getJuliaFlags(): string[] {
+function getJuliaFlags(): { flags: string[]; usingSysimage: boolean } {
   const flags = process.env.JULIA_FLAGS?.split(/\s+/).filter(Boolean) ?? [];
-  // --pkgimages=no avoids segfaults during native code image serialisation
-  // in memory-constrained or sandboxed environments.
-  if (!flags.some((f) => f.startsWith("--pkgimages"))) {
+  let usingSysimage = false;
+
+  // If a custom sysimage exists, use it — packages are pre-compiled inside,
+  // so no pkgimages needed and no segfault risk.
+  if (!flags.some((f) => f.startsWith("--sysimage")) && existsSync(JULIA_SYSIMAGE_PATH)) {
+    flags.push(`--sysimage=${JULIA_SYSIMAGE_PATH}`);
+    usingSysimage = true;
+    logger.info(`Using custom sysimage: ${JULIA_SYSIMAGE_PATH}`);
+  } else if (!flags.some((f) => f.startsWith("--pkgimages"))) {
+    // Fallback: --pkgimages=no avoids segfaults during native code image
+    // loading for heavy packages, but is slow. Build a sysimage to fix:
+    //   julia julia/build_sysimage.jl
     flags.push("--pkgimages=no");
   }
-  return flags;
+
+  return { flags, usingSysimage };
 }
 
 function getEarth4AllSrc(): string {
@@ -70,8 +83,9 @@ export async function ensureWorker(): Promise<void> {
 
   return new Promise((resolve, reject) => {
     const juliaCmd = getJuliaCommand();
-    const juliaFlags = getJuliaFlags();
+    const { flags: juliaFlags, usingSysimage } = getJuliaFlags();
     const e4aSrc = getEarth4AllSrc();
+    const startupTimeout = usingSysimage ? JULIA_SYSIMAGE_STARTUP_TIMEOUT_MS : JULIA_STARTUP_TIMEOUT_MS;
 
     logger.info(`Starting Julia worker: ${juliaCmd} ${[...juliaFlags, JULIA_WORKER_SCRIPT, e4aSrc].join(" ")}`);
 
@@ -86,8 +100,8 @@ export async function ensureWorker(): Promise<void> {
     const timeout = setTimeout(() => {
       state.starting = false;
       proc.kill();
-      reject(new Error(`Julia worker startup timed out after ${JULIA_STARTUP_TIMEOUT_MS / 1000}s`));
-    }, JULIA_STARTUP_TIMEOUT_MS);
+      reject(new Error(`Julia worker startup timed out after ${startupTimeout / 1000}s`));
+    }, startupTimeout);
 
     proc.stderr?.on("data", (data: Buffer) => {
       logger.debug(`Julia stderr: ${data.toString().trim()}`);

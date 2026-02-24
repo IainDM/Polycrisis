@@ -12,7 +12,8 @@
     "start:explorer": "npx tsx src/servers/explorer-server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:julia": "julia julia/test/runtests.jl"
+    "test:julia": "julia julia/test/runtests.jl",
+    "build:sysimage": "julia julia/build_sysimage.jl"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
