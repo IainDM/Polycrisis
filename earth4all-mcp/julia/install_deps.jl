@@ -12,6 +12,7 @@ Pkg.add([
     "WorldDynamics",
     "JSON",
     "IfElse",
+    "PlotlyJS",
     "PackageCompiler",
 ])
 
