@@ -1,0 +1,3 @@
+[submodule "Earth4All.jl"]
+	path = Earth4All.jl
+	url = https://github.com/IainDM/Earth4All.jl.git
