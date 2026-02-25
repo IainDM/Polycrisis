@@ -33,7 +33,7 @@ for (const name of EXPLORER_TOOLS) {
   });
 }
 
-for (const key of ["parameters", "variables", "troubleshooting"]) {
+for (const key of ["parameters", "variables", "troubleshooting", "julia-api"]) {
   const guide = GUIDES[key];
   if (guide) {
     const uri = `earth4all://guides/${key}`;

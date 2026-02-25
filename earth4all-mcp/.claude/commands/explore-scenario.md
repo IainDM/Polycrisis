@@ -23,3 +23,15 @@ Provide a description of what you want to explore, such as:
 - "Compare TLTL vs Giant Leap focusing on wellbeing outcomes"
 
 The agent will use the Earth4All MCP server tools to set up, run, and analyse the scenarios.
+
+## Earth4All.jl API
+
+The MCP tools are backed by the **Earth4All.jl** Julia library. Understanding the Julia API helps with deeper exploration:
+
+- **Model structure**: `list_stocks()`, `stock_flows(name)`, `list_flows()`, `list_auxiliaries()` expose the system dynamics structure — stocks (state variables), flows (rates of change), and auxiliaries (algebraic computations). Use these to trace causal pathways through the model.
+- **Custom simulations**: `run_e4a_solution(; cli_pars=..., dem_pars=..., ...)` runs fully customised scenarios by passing modified parameter dictionaries for any of the 12 sectors.
+- **Variable inspection**: `variable_list(sol)` lists all variables; `get_timeseries(sol, name)` extracts time series. Julia uses `₊` separator (e.g. `pop₊POP`), MCP uses `.` (e.g. `pop.POP`).
+- **Sector defaults**: Each sector module provides `getparameters()` and `getinitialisations()` to retrieve default values.
+- **Validation**: `check_solution(sol)` validates output against Vensim reference data.
+
+See `earth4all://guides/julia-api` for the full reference.

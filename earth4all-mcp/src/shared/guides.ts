@@ -273,6 +273,111 @@ Use get_variable_timeseries with the variable code (e.g., "pop.POP") to get the 
 - GL: rises to ~1.8 by 2100
 `;
 
+export const JULIA_API_GUIDE = `# Earth4All.jl API Reference
+
+The MCP tools you use are backed by **Earth4All.jl**, a Julia implementation of the Earth4All integrated assessment model. Understanding this API helps you explain the model internals to users and reason about simulation results.
+
+## Running Simulations
+
+Earth4All.jl provides three levels of simulation functions:
+
+### Scenario Builders (build but do not solve)
+- \`run_tltl()\` — Build the Too Little Too Late (business-as-usual) scenario
+- \`run_gl()\` — Build the Giant Leap scenario with policy parameters pre-configured
+- \`run_e4a(; <sector>_pars..., <sector>_inits...)\` — Build a fully customisable scenario
+
+### Solution Functions (build and solve, returning a SciML ODESolution for 1980–2100)
+- \`run_tltl_solution()\` — Solve TLTL
+- \`run_gl_solution()\` — Solve Giant Leap
+- \`run_e4a_solution(; kwargs...)\` — Solve a custom scenario
+
+Custom scenario example:
+\`\`\`julia
+cli_ps = Earth4All.Climate.getparameters()
+cli_ps[:DACCO22100] = 16.0
+sol = Earth4All.run_e4a_solution(cli_pars=cli_ps)
+\`\`\`
+
+## Inspecting Variables
+
+### \`variable_list(sol)\`
+Returns a sorted list of all variables in a solution as \`(name, description)\` tuples.
+Variable names are namespaced by sector using the \`₊\` separator, e.g. \`pop₊POP\`, \`cli₊OW\`, \`dem₊INEQ\`.
+
+### \`get_timeseries(sol, name)\`
+Extract the time series for any variable. Accepts either:
+- Full namespaced name: \`"pop₊POP"\`
+- Short name (if unambiguous): \`"GDPP"\`
+
+Returns \`(t=Vector, values=Vector)\`.
+
+## Model Structure (System Dynamics)
+
+These functions expose the causal structure of the model — which variables are stocks (state variables governed by differential equations), which are flows (rates of change), and which are auxiliaries (algebraic computations).
+
+### \`list_stocks()\`
+List every stock (state/level) variable. Stocks are governed by \`D(x) = inflows - outflows\`.
+Returns: \`name\`, \`description\`, \`sector\`, \`equation\`.
+
+### \`stock_flows(stock_name)\`
+Show the inflows and outflows for a specific stock. Accepts full (\`"pop₊A0020"\`) or short (\`"A0020"\`) names.
+Returns: \`name\`, \`description\`, \`sector\`, \`equation\`, \`inflows\`, \`outflows\`.
+
+### \`list_flows()\`
+List every flow term that appears as an inflow or outflow of at least one stock.
+Returns: \`name\`, \`as_inflow_of\`, \`as_outflow_of\`.
+
+### \`flow_stocks(flow_name)\`
+Show which stock(s) a particular flow feeds into or drains from.
+
+### \`list_auxiliaries()\`
+List every auxiliary (algebraic) variable — computed each time step from stocks, parameters, and other auxiliaries.
+Returns: \`name\`, \`description\`, \`sector\`.
+
+## Sector Modules
+
+The model comprises 12 sector modules, each with its own prefix:
+
+| Module | Prefix | Domain |
+|--------|--------|--------|
+| Climate | cli | Greenhouse gases, warming, ice melt |
+| Demand | dem | Consumption, inequality, government finance |
+| Energy | ene | Fossil fuels, renewables, electrification |
+| Finance | fin | Investment, credit, interest rates |
+| FoodLand | foo | Agriculture, land use, food supply |
+| Inventory | inv | GDP, inventory management |
+| LabourMarket | lab | Employment, wages, participation |
+| Other | oth | Supplementary variables |
+| Output | out | Productivity, capacity, output |
+| Population | pop | Demographics, life expectancy, fertility |
+| Public | pub | Government spending, taxation |
+| Wellbeing | wel | Wellbeing indices, social tension/trust |
+
+### Retrieving Defaults
+Every sector provides:
+- \`<Sector>.getparameters()\` — returns a copy of default parameter values
+- \`<Sector>.getinitialisations()\` — returns a copy of default initial conditions
+
+## Plotting
+
+- \`fig_baserun_tltl()\` — Plot 6 key indicators (POP, AWBI, GDPP, STE, INEQ, OW) for TLTL
+- \`fig_baserun_gl()\` — Same for Giant Leap
+
+## Variable Naming Convention
+
+In the Julia API, variables use the \`₊\` separator: \`pop₊POP\`, \`cli₊OW\`.
+In the MCP tools, the convention is \`sector.VAR\`: \`pop.POP\`, \`cli.OW\`.
+Both refer to the same underlying model variables.
+
+## Validation Utilities
+
+Earth4All.jl includes utilities for comparing model output against Vensim reference data:
+- \`check_solution(sol)\` — Validate against Vensim reference for all 12 sectors
+- \`all_mre(scen, sol)\` — Print maximum relative error per sector
+- \`compare_and_plot(scen, sol, desc, ...)\` — Find a variable by description and plot against reference
+- \`plot_two_sols(scen1, sol1, scen2, sol2, ...)\` — Compare same variable across two solutions
+`;
+
 export const GUIDES: Record<string, { name: string; description: string; content: string }> = {
   "model-overview": {
     name: "Model Overview",
@@ -298,5 +403,10 @@ export const GUIDES: Record<string, { name: string; description: string; content
     name: "Variables Reference",
     description: "Key output variables, their meanings, units, and expected ranges",
     content: VARIABLES_GUIDE,
+  },
+  "julia-api": {
+    name: "Julia API Reference",
+    description: "Earth4All.jl Julia API: simulation functions, model structure (stocks/flows/auxiliaries), sector modules, and validation utilities",
+    content: JULIA_API_GUIDE,
   },
 };
