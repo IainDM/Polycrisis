@@ -67,7 +67,16 @@ server.prompt(
 - Explain the real-world meaning of parameters and results.
 - Use the five turnarounds as the primary lens for understanding policy options.
 - Compare against both TLTL (business as usual) and GL (full transformation) as benchmarks.
-- Present results in terms of human impact: lives, livelihoods, and the environment.`,
+- Present results in terms of human impact: lives, livelihoods, and the environment.
+
+## Earth4All.jl API
+The MCP tools are backed by Earth4All.jl, a Julia library. Understanding the Julia API helps explain model internals:
+- **Model structure**: \`list_stocks()\`, \`stock_flows(name)\`, \`list_flows()\`, \`list_auxiliaries()\` expose the system dynamics structure — stocks, flows, and algebraic variables across 12 sectors.
+- **Custom simulations**: \`run_e4a_solution(; cli_pars=..., dem_pars=...)\` runs fully customised scenarios.
+- **Variable inspection**: \`variable_list(sol)\` and \`get_timeseries(sol, name)\` for exploring outputs. Julia uses \`₊\` separator (e.g. \`pop₊POP\`), MCP uses \`.\` (e.g. \`pop.POP\`).
+- **Sector defaults**: Each of the 12 sector modules provides \`getparameters()\` and \`getinitialisations()\`.
+- **Validation**: \`check_solution(sol)\` validates against Vensim reference data.
+See earth4all://guides/julia-api for the full reference.`,
         },
       },
     ],
